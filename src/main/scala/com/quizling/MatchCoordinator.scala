@@ -53,7 +53,7 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
   private var completedQuestions = List.empty[QuestionResult]
 
   // Request first quiz question
-  requestQuestion()
+  context.self ! RequestQuizQuestion()
 
   override def onMessage(msg: MatchCoordinatorCommand): Behavior[MatchCoordinatorCommand] = {
     msg match {
@@ -71,18 +71,16 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
           this
         } else {
           ctx.log.info(s"Match $matchId complete")
-          // TODO Send socket message with score and summary and send message to director with information for db write (actually maybe put that in a poststop???
+          // TODO Send socket message with score and summary and send message to director with information for db write (actually maybe put that in a poststop???)
           Behaviors.stopped
         }
       }
 
       case QuestionReadyMessage(questionId, config) => {
         context.log.info(s"Question $questionId for match $matchId ready")
-        if (activeQuestions.contains(questionId)) {
-          // TODO Send socket message with question info
-        } else {
-          context.log.info(s"Question $questionId for match $matchId not found in active questions")
-        }
+        activeQuestions.get(questionId).fold
+          { context.log.info(s"Question $questionId for match $matchId not found in active questions") }
+          { qu => /* TODO send socket message */ }
         this
       }
 
@@ -90,26 +88,26 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
         activeQuestions.get(questionId).fold {
           context.log.info(s"Question $questionId is not currently active for answer $answerId")
           // TODO Send socket message?
-          this
         }{ qu =>
           context.log.info(s"Answer $answerId for question $questionId being passed to actor $qu")
           qu ! AnswerQuestionRequest(questionId, answerId, participantId, answer)
-          this
         }
+        this
       }
 
-      case QuestionResolvedMessage(questionId, result @ QuestionResult(answeredCorrectly, answeredBy, timedOut)) => {
-        // TODO Consider if want to pattern match against answeredCorrectly...definitely could but some duplicated code
-        if (answeredCorrectly) {
-          context.log.info(s"Question $questionId correctly answered by $answeredBy")
-          val answerer = answeredBy.get // Bad practice here...should fix
-          val currentScore = score.get(answerer).getOrElse(MatchCoordinator.DEFAULT_SCORE)
-          score += answerer -> (currentScore + 1)
-        } else {
-          context.log.info(s"Question $questionId not answered correctly")
-        }
+      case QuestionResolvedMessage(questionId, result @ QuestionResult(true, answeredBy, timedOut)) => {
+        context.log.info(s"Question $questionId correctly answered by $answeredBy")
+        val answerer = answeredBy.get // Bad practice here...should fix
+        val currentScore = score.get(answerer).getOrElse(MatchCoordinator.DEFAULT_SCORE)
+        score += answerer -> (currentScore + 1)
+        resolveQuestion(result)
+        this
+      }
+
+      case QuestionResolvedMessage(questionId, result @ QuestionResult(false, _, _)) => {
+        context.log.info(s"Question $questionId not answered correctly")
         completedQuestions = completedQuestions :+ result
-        requestQuestion()
+        resolveQuestion(result)
         this
       }
 
@@ -117,15 +115,12 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
         context.log.info(s"Incorrect answer $answerId for question $questionId by participant $participantId")
         this
       }
-
-      case _ => {
-        println("Catch all")
-        Behaviors.unhandled
-      }
     }
   }
 
-  private def requestQuestion(): Unit = {
+  // Resolve question by adding result to completedQuestions and request next question (eventually might split this into a db write as well)
+  private def resolveQuestion(result: QuestionResult): Unit = {
+    completedQuestions = completedQuestions :+ result
     context.self ! RequestQuizQuestion()
   }
 }

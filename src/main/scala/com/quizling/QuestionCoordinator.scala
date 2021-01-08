@@ -54,7 +54,7 @@ class QuestionCoordinator(ctx: ActorContext[QuestionCommand],
         requester ! IncorrectAnswerMessage(questionId, answerId, participantId = participantId)
 
         // If every participant has answered then send message saying to not wait on timeout and stop
-        if (!participantAnswers.exists(_._2 == false)) {
+        if (!participantAnswers.exists(x => x._2 == false)) {
           val result = QuestionResult(answeredCorrectly = false, timedOut = false)
           requester ! QuestionResolvedMessage(questionId, result)
           Behaviors.stopped
@@ -66,12 +66,7 @@ class QuestionCoordinator(ctx: ActorContext[QuestionCommand],
         context.log.info(s"Question $questionId timed out")
         val questionResult = QuestionResult(answeredCorrectly = false, timedOut = true)
         requester ! QuestionResolvedMessage(questionId, questionResult)
-        Behaviors.stopped // Want to have a poststop action here?? I can't think of what it might be
-      }
-
-      case _ => {
-        context.log.info(s"Question actor ${context.self} unable to handle message and ignoring: $msg")
-        Behaviors.unhandled
+        Behaviors.stopped
       }
     }
   }

@@ -2,9 +2,9 @@ package com.quizling
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, Behavior, PostStop, Signal}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import com.quizling.Director.{CreateMatch, DirectorCommand}
+import akka.actor.typed.{ActorRef, Behavior}
+import com.quizling.Director.{CreateMatch, DirectorCommand, RespondMatchQuery, RetrieveMatch}
 import com.quizling.MatchCoordinator.{MatchCoordinatorCommand, MatchParticipant}
 import com.quizling.QuestionCoordinator.Question
 
@@ -18,6 +18,8 @@ object Director {
 
   sealed trait DirectorCommand
   final case class CreateMatch(configuration: MatchConfiguration, id: Option[String] = None) extends DirectorCommand
+  final case class RetrieveMatch(matchId: String, replyTo: ActorRef[RespondMatchQuery]) extends DirectorCommand
+  final case class RespondMatchQuery(actorRef: Option[ActorRef[MatchCoordinatorCommand]]) extends DirectorCommand
 
   // Director domain objects
   final class Quiz(val questions: Seq[Question])
@@ -41,6 +43,13 @@ class Director(ctx: ActorContext[Director.DirectorCommand]) extends AbstractBeha
         context.log.info(s"Creating match $matchId")
         val matchCoordinator = ctx.spawn(MatchCoordinator(matchId, configuration), matchId)
         activeMatches += (matchId -> matchCoordinator)
+        this
+      }
+
+      case RetrieveMatch(matchId, replyTo) => {
+        val responseMsg = activeMatches.get(matchId)
+          .fold{ RespondMatchQuery(None) } { x => RespondMatchQuery(Some(x)) }
+        replyTo ! responseMsg
         this
       }
     }
