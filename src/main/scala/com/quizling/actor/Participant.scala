@@ -1,4 +1,4 @@
-package com.quizling
+package com.quizling.actor
 
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}

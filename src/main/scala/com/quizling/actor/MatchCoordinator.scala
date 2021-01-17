@@ -1,26 +1,31 @@
-package com.quizling
+package com.quizling.actor
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import com.quizling.Director.MatchConfiguration
-import com.quizling.MatchCoordinator.{AnswerQuestion, IncorrectAnswerMessage, MatchCoordinatorCommand, QuestionConfiguration, QuestionReadyMessage, QuestionResolvedMessage, QuestionResult, RequestQuizQuestion}
-import com.quizling.QuestionCoordinator.{Answer, AnswerQuestionRequest, Question, QuestionCommand}
+import akka.actor.typed.{ActorRef, Behavior}
+import com.quizling.actor.Director.{DirectorCommand, MatchConfiguration}
+import com.quizling.actor.MatchCoordinator._
+import com.quizling.actor.QuestionCoordinator.{Answer, AnswerQuestionRequest, Question, QuestionEvent}
+import com.quizling.actor.SocketEvent.{SocketMessage, WebsocketEvent}
 
 import scala.concurrent.duration.FiniteDuration
 
 object MatchCoordinator {
   final val DEFAULT_SCORE = 0
 
-  def apply(matchId: String, matchConfiguration: MatchConfiguration): Behavior[MatchCoordinatorCommand] =
-    Behaviors.setup(ctx => new MatchCoordinator(ctx, matchId, matchConfiguration))
+  def apply(matchId: String,
+            matchConfiguration: MatchConfiguration,
+            director: ActorRef[DirectorCommand],
+            socketWriter: ActorRef[WebsocketEvent]): Behavior[MatchCoordinatorEvent] =
+    Behaviors.setup(ctx => new MatchCoordinator(ctx, matchId, matchConfiguration, director, socketWriter))
 
-  sealed trait MatchCoordinatorCommand
-  final case class AnswerQuestion(answerId: String, questionId: String, participantId: String, answer: Answer) extends MatchCoordinatorCommand
-  final case class RequestQuizQuestion() extends MatchCoordinatorCommand
+  sealed trait MatchCoordinatorEvent
+  final case class AnswerQuestion(answerId: String, questionId: String, participantId: String, answer: Answer) extends MatchCoordinatorEvent
+  final case object RequestQuizQuestion extends MatchCoordinatorEvent
+  final case class RemoveMeFixMessage(msg: String) extends MatchCoordinatorEvent // FIXME This is temporary for testing
 
-  sealed trait QuestionAction extends MatchCoordinatorCommand
+  sealed trait QuestionAction extends MatchCoordinatorEvent
   final case class IncorrectAnswerMessage(questionId: String, answerId: String, participantId: String) extends QuestionAction
   final case class QuestionResolvedMessage(questionId: String, result: QuestionResult) extends QuestionAction
   final case class QuestionReadyMessage(questionId: String, questionConfig: QuestionConfiguration) extends QuestionAction
@@ -34,30 +39,28 @@ object MatchCoordinator {
                                  )
 }
 
-class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: String, matchConfiguration: MatchConfiguration)
-  extends AbstractBehavior[MatchCoordinatorCommand](ctx) {
+class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: String,
+                       val matchConfiguration: MatchConfiguration,
+                       val director: ActorRef[DirectorCommand],
+                       val socketWriter: ActorRef[WebsocketEvent])
+  extends AbstractBehavior[MatchCoordinatorEvent](ctx) {
 
-  // What to do on startup...namely spin up the participants actors then create the first question from the quiz
   // FIXME Decide if we want participant actors or now, for now no
-//  private var participants = for (participant <- matchConfiguration.participants)
-//    yield participant.participantId -> ctx.spawn(Participant(), participant.participantId)
 
-  private val participants = (matchConfiguration.participants.map(_.participantId))
-
-  // FIXME this is hideous, but works for now...need the for comprehension to return a map which I'm not sure it can
-  private var score = (for (participant <- matchConfiguration.participants; id = participant.participantId)
+  private val participants: Set[String] = (matchConfiguration.participants.map(_.participantId))
+  private var score: Map[String, Int] = (for (participant <- matchConfiguration.participants; id = participant.participantId)
     yield { id -> MatchCoordinator.DEFAULT_SCORE }).toMap
 
   private var quizQuestions = matchConfiguration.quiz.questions
-  private var activeQuestions = Map.empty[String, ActorRef[QuestionCommand]]
+  private var activeQuestions = Map.empty[String, ActorRef[QuestionEvent]]
   private var completedQuestions = List.empty[QuestionResult]
 
   // Request first quiz question
-  context.self ! RequestQuizQuestion()
+  context.self ! RequestQuizQuestion
 
-  override def onMessage(msg: MatchCoordinatorCommand): Behavior[MatchCoordinatorCommand] = {
+  override def onMessage(msg: MatchCoordinatorEvent): Behavior[MatchCoordinatorEvent] = {
     msg match {
-      case RequestQuizQuestion() => {
+      case RequestQuizQuestion => {
         // If no more quiz questions then done
         if (!quizQuestions.isEmpty) {
           val questionId = UUID.randomUUID().toString
@@ -79,15 +82,16 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
       case QuestionReadyMessage(questionId, config) => {
         context.log.info(s"Question $questionId for match $matchId ready")
         activeQuestions.get(questionId).fold
-          { context.log.info(s"Question $questionId for match $matchId not found in active questions") }
-          { qu => /* TODO send socket message */ }
+          { context.log.error(s"Question $questionId for match $matchId not found in active questions") }
+          { qu =>
+            // FIXME Should send socket message indicating how to configure the question for the UI
+          }
         this
       }
 
       case AnswerQuestion(answerId, questionId, participantId, answer) => {
         activeQuestions.get(questionId).fold {
-          context.log.info(s"Question $questionId is not currently active for answer $answerId")
-          // TODO Send socket message?
+          context.log.error(s"Question $questionId is not currently active for answer $answerId")
         }{ qu =>
           context.log.info(s"Answer $answerId for question $questionId being passed to actor $qu")
           qu ! AnswerQuestionRequest(questionId, answerId, participantId, answer)
@@ -98,7 +102,7 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
       case QuestionResolvedMessage(questionId, result @ QuestionResult(true, answeredBy, timedOut)) => {
         context.log.info(s"Question $questionId correctly answered by $answeredBy")
         val answerer = answeredBy.get // Bad practice here...should fix
-        val currentScore = score.get(answerer).getOrElse(MatchCoordinator.DEFAULT_SCORE)
+        val currentScore = score.getOrElse(answerer, MatchCoordinator.DEFAULT_SCORE)
         score += answerer -> (currentScore + 1)
         resolveQuestion(result)
         this
@@ -115,12 +119,19 @@ class MatchCoordinator(ctx: ActorContext[MatchCoordinatorCommand], matchId: Stri
         context.log.info(s"Incorrect answer $answerId for question $questionId by participant $participantId")
         this
       }
+
+      case RemoveMeFixMessage(msg) => {
+        context.log.info(s"Holy shit it worked. This is a message from the socket $msg \n Waiting 5 seconds and sending a message back")
+        Thread.sleep(5000)
+        socketWriter ! SocketMessage("holy shit this worked too...it's a message from the MatchCoordinator")
+        this
+      }
     }
   }
 
   // Resolve question by adding result to completedQuestions and request next question (eventually might split this into a db write as well)
   private def resolveQuestion(result: QuestionResult): Unit = {
     completedQuestions = completedQuestions :+ result
-    context.self ! RequestQuizQuestion()
+    context.self ! RequestQuizQuestion
   }
 }

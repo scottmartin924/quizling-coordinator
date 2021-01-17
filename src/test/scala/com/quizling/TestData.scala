@@ -1,8 +1,9 @@
 package com.quizling
 
-import com.quizling.Director.{MatchConfiguration, Quiz}
-import com.quizling.MatchCoordinator.MatchParticipant
-import com.quizling.QuestionCoordinator.{Answer, Question}
+import com.quizling.actor.Director.{MatchConfiguration, Quiz}
+import com.quizling.actor.MatchCoordinator.MatchParticipant
+import com.quizling.actor.QuestionCoordinator.{Answer, Question}
+
 
 object TestData {
 

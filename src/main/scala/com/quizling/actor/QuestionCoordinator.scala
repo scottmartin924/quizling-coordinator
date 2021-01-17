@@ -1,15 +1,15 @@
-package com.quizling
+package com.quizling.actor
 
-import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, TimerScheduler}
-import com.quizling.MatchCoordinator.{IncorrectAnswerMessage, QuestionAction, QuestionConfiguration, QuestionReadyMessage, QuestionResolvedMessage, QuestionResult}
-import com.quizling.QuestionCoordinator.{Answer, AnswerQuestionRequest, QuestionCommand, QuestionTimeout}
+import akka.actor.typed.{ActorRef, Behavior}
+import com.quizling.actor.MatchCoordinator.{IncorrectAnswerMessage, QuestionAction, QuestionConfiguration, QuestionReadyMessage, QuestionResolvedMessage, QuestionResult}
+import com.quizling.actor.QuestionCoordinator.{Answer, AnswerQuestionRequest, QuestionEvent, QuestionTimeout}
 
 object QuestionCoordinator {
   def apply(questionId: String,
             questionConfig: QuestionConfiguration,
             participants: Set[String],
-            questionRequester: ActorRef[QuestionAction]): Behavior[QuestionCommand] =
+            questionRequester: ActorRef[QuestionAction]): Behavior[QuestionEvent] =
     Behaviors.setup(ctx =>
       Behaviors.withTimers { timers =>
         new QuestionCoordinator(ctx, questionId, questionConfig, participants, timers, questionRequester)
@@ -18,18 +18,18 @@ object QuestionCoordinator {
   final case class Answer(answerText: String, isCorrect: Boolean)
   final case class Question(questionText: String, answers: Seq[Answer])
 
-  sealed trait QuestionCommand
-  final case class AnswerQuestionRequest(questionId: String, answerId: String, participantId: String, answer: Answer) extends QuestionCommand // FIXME put in the stuff that will come with an answered question
-  private final case object QuestionTimeout extends QuestionCommand
+  sealed trait QuestionEvent
+  final case class AnswerQuestionRequest(questionId: String, answerId: String, participantId: String, answer: Answer) extends QuestionEvent // FIXME put in the stuff that will come with an answered question
+  private final case object QuestionTimeout extends QuestionEvent
 }
 
-class QuestionCoordinator(ctx: ActorContext[QuestionCommand],
+class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
                           questionId: String,
                           config: QuestionConfiguration,
                           participants: Set[String],
-                          timers: TimerScheduler[QuestionCommand],
+                          timers: TimerScheduler[QuestionEvent],
                           requester: ActorRef[QuestionAction])
-  extends AbstractBehavior[QuestionCommand](ctx) {
+  extends AbstractBehavior[QuestionEvent](ctx) {
 
   // Set all participants to not having answered yet
   var participantAnswers = (for (id <- participants) yield id -> false).toMap
@@ -38,7 +38,7 @@ class QuestionCoordinator(ctx: ActorContext[QuestionCommand],
   config.timer.foreach(time => timers.startSingleTimer(QuestionTimeout, time))
   requester ! QuestionReadyMessage(questionId, config)
 
-  override def onMessage(msg: QuestionCommand): Behavior[QuestionCommand] = {
+  override def onMessage(msg: QuestionEvent): Behavior[QuestionEvent] = {
     msg match {
       case AnswerQuestionRequest(`questionId`, answerId, participantId, Answer(_, true)) => {
         context.log.info(s"Question $questionId answered correct by answer $answerId")
