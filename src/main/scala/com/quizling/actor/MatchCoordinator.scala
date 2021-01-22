@@ -23,7 +23,6 @@ object MatchCoordinator {
   sealed trait MatchCoordinatorEvent
   final case class AnswerQuestion(answerId: String, questionId: String, participantId: String, answer: Answer) extends MatchCoordinatorEvent
   final case object RequestQuizQuestion extends MatchCoordinatorEvent
-  final case class RemoveMeFixMessage(msg: String) extends MatchCoordinatorEvent // FIXME This is temporary for testing
 
   sealed trait QuestionAction extends MatchCoordinatorEvent
   final case class IncorrectAnswerMessage(questionId: String, answerId: String, participantId: String) extends QuestionAction
@@ -31,8 +30,8 @@ object MatchCoordinator {
   final case class QuestionReadyMessage(questionId: String, questionConfig: QuestionConfiguration) extends QuestionAction
 
   // Match coordinator domain objects
-  final class MatchParticipant(val participantId: String)
-  final class QuestionConfiguration(val question: Question, val timer: Option[FiniteDuration] = None)
+  final case class MatchParticipant(participantId: String)
+  final case class QuestionConfiguration(question: Question, timer: Option[FiniteDuration] = None)
   final case class QuestionResult(answeredCorrectly: Boolean,
                                   answeredBy: Option[String] = None,
                                   timedOut: Boolean = false
@@ -45,9 +44,7 @@ class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: St
                        val socketWriter: ActorRef[WebsocketEvent])
   extends AbstractBehavior[MatchCoordinatorEvent](ctx) {
 
-  // FIXME Decide if we want participant actors or now, for now no
-
-  private val participants: Set[String] = (matchConfiguration.participants.map(_.participantId))
+  private val participants: Set[String] = matchConfiguration.participants.map(_.participantId)
   private var score: Map[String, Int] = (for (participant <- matchConfiguration.participants; id = participant.participantId)
     yield { id -> MatchCoordinator.DEFAULT_SCORE }).toMap
 
@@ -73,8 +70,10 @@ class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: St
           quizQuestions = quizQuestions.tail
           this
         } else {
-          ctx.log.info(s"Match $matchId complete")
           // TODO Send socket message with score and summary and send message to director with information for db write (actually maybe put that in a poststop???)
+          // In order to do that need to settle on protocol of messages
+          ctx.log.info(s"Match $matchId complete")
+          socketWriter ! SocketMessage(s"Match $matchId complete")
           Behaviors.stopped
         }
       }
@@ -85,13 +84,14 @@ class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: St
           { context.log.error(s"Question $questionId for match $matchId not found in active questions") }
           { qu =>
             // FIXME Should send socket message indicating how to configure the question for the UI
+            socketWriter ! SocketMessage(s"New message ready!! ${config.question.questionText}")
           }
         this
       }
 
       case AnswerQuestion(answerId, questionId, participantId, answer) => {
         activeQuestions.get(questionId).fold {
-          context.log.error(s"Question $questionId is not currently active for answer $answerId")
+          context.log.error(s"Question $questionId is not currently active to accept answer $answerId")
         }{ qu =>
           context.log.info(s"Answer $answerId for question $questionId being passed to actor $qu")
           qu ! AnswerQuestionRequest(questionId, answerId, participantId, answer)
@@ -117,13 +117,7 @@ class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: St
 
       case IncorrectAnswerMessage(questionId, answerId, participantId) => {
         context.log.info(s"Incorrect answer $answerId for question $questionId by participant $participantId")
-        this
-      }
-
-      case RemoveMeFixMessage(msg) => {
-        context.log.info(s"Holy shit it worked. This is a message from the socket $msg \n Waiting 5 seconds and sending a message back")
-        Thread.sleep(5000)
-        socketWriter ! SocketMessage("holy shit this worked too...it's a message from the MatchCoordinator")
+        // FIXME Send message indicating answer incorrect
         this
       }
     }

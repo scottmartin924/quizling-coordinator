@@ -39,9 +39,10 @@ class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
   requester ! QuestionReadyMessage(questionId, config)
 
   override def onMessage(msg: QuestionEvent): Behavior[QuestionEvent] = {
+    // FIXME Make this exhaustive
     msg match {
       case AnswerQuestionRequest(`questionId`, answerId, participantId, Answer(_, true)) => {
-        context.log.info(s"Question $questionId answered correct by answer $answerId")
+        context.log.info(s"Question $questionId answered correctly by answer $answerId")
         val questionResult = QuestionResult(answeredCorrectly = true, answeredBy = Some(participantId))
         requester ! QuestionResolvedMessage(questionId, questionResult)
         Behaviors.stopped
