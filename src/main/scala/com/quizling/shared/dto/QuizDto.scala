@@ -1,7 +1,7 @@
 package com.quizling.shared.dto
 
-final case class QuizDto(questions: Seq[QuestionDto])
+final case class QuizDto(questions: Seq[QuestionConfigurationDto])
 
-final case class QuestionDto(questionText: String, answers: Seq[AnswerDto])
+final case class QuestionConfigurationDto(questionText: String, answers: Seq[AnswerConfigurationDto])
 
-final case class AnswerDto(answerText: String, isCorrect: Boolean)
+final case class AnswerConfigurationDto(answerText: String, isCorrect: Boolean)

@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 // TODO Figure out marshalling/unmarshalling for socket messages (and http, but that seems easier)
+// TODO Complete MatchResult object and have it write to mongo
 // TODO Fix the hideousness of the controller socket handler
 // TODO Add a readme once everything is running and looks moderately not terrible
 // TODO Add more testing (especially async testing)
