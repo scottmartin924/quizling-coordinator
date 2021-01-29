@@ -1,7 +1,7 @@
 package com.quizling.shared.dto.socket
 
-import com.quizling.actor.MatchCoordinator.{AnswerQuestion, MatchCoordinatorEvent}
-import com.quizling.shared.dto.socket.Protocol.{SocketDto, SubmittedAnswerEvent}
+import com.quizling.actor.MatchCoordinator.{AnswerQuestion, MatchCoordinatorEvent, ParticipantReadyEvent}
+import com.quizling.shared.dto.socket.Protocol.{ParticipantReady, SocketDto, SubmittedAnswerEvent}
 
 object SocketDtoToCoordinatorEventAdapter {
 
@@ -13,7 +13,7 @@ object SocketDtoToCoordinatorEventAdapter {
           answerId = answer.answerId,
           answer = answer.answerText)
       }
-
+      case ParticipantReady(partId) => ParticipantReadyEvent(partId)
     }
   }
 }

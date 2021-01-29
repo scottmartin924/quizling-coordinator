@@ -1,7 +1,6 @@
 package com.quizling.shared.dto.socket
 
 object Protocol {
-  // Use typehint to deserialize generic class
   sealed trait SocketDto
 
   sealed trait ClientEvent extends SocketDto
@@ -9,6 +8,7 @@ object Protocol {
 
   final case class AnswerSocketDto(answerId: String, answerText: String) extends SocketDto
   final case class SubmittedAnswerEvent(questionId: String, participantId: String, answer: AnswerSocketDto) extends ClientEvent
+  final case class ParticipantReady(participantId: String) extends ClientEvent
   final case class QuestionSocketDto(questionId: String, questionText: String, answers: Seq[AnswerSocketDto], timer: Option[Int]) extends ServerEvent
   final case class AnswerCorrectEvent(questionId: String, answererId: String, correctAnswer: AnswerSocketDto, score: Map[String, Int]) extends ServerEvent
   final case class AnswerIncorrectEvent(questionId: String, incorrectAnswerId: String, participantId: String) extends ServerEvent

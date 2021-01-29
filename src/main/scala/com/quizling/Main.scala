@@ -13,16 +13,14 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-// TODO Figure out marshalling/unmarshalling for socket messages (and http, but that seems easier)
-// TODO Complete MatchResult object and have it write to mongo
-// TODO Fix the hideousness of the controller socket handler
-// TODO Add a readme once everything is running and looks moderately not terrible
 // TODO Add more testing (especially async testing)
+// TODO Add a readme once everything is running and looks moderately not terrible
 // TODO Add code docs
+// TODO Improve logging (look into Akka logging)
+// TODO Fault tolerance (Akka persistence, and more watchers, etc)
 
 // Very low priority
 // TODO Convert OO style to functional just to try to understand it better
-// FIXME get a better package structure...not sure what's "standard"
 
 object QuizlingApp extends App {
   val root = Behaviors.setup[Nothing]{ context =>

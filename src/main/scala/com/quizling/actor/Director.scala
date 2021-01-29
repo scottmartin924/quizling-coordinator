@@ -66,7 +66,7 @@ object Director {
 
   final class MatchDependencies(val coordinator: ActorRef[MatchCoordinatorEvent],
                                 val socketFlow: Flow[Message, Message, Any])
-  final class MatchResult(val matchId: String) //TODO Insert matchresult info as well
+  final case class MatchResult(score: Map[String, Int])
 }
 
 class Director(ctx: ActorContext[Director.DirectorCommand], dbInserter: AbstractDbInsert[MatchReport])
@@ -87,7 +87,7 @@ class Director(ctx: ActorContext[Director.DirectorCommand], dbInserter: Abstract
 
       case MatchCompleted(id, result) => {
         context.log.info(s"Match $id completed")
-        dbWriter ! DatabasePersistRequest(MatchReport(matchId = id))
+        dbWriter ! DatabasePersistRequest(MatchReport(matchId = id, score = result.score))
         activeMatches -= id
         this
       }
