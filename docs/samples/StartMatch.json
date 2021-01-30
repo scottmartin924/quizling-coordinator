@@ -1,0 +1,59 @@
+{
+  "configuration": {
+    "participants": [
+      {
+        "participantId": "Scott"
+      },
+      {
+        "participantId": "Colleen"
+      }
+    ],
+    "quiz": {
+      "questions": [
+        {
+          "questionText": "Who wrote Murder on the Orient Express?",
+          "answers": [
+            {
+              "answerText": "J.K. Rowling",
+              "isCorrect": false
+            },
+            {
+              "answerText": "Charles Dickens",
+              "isCorrect": false
+            },
+            {
+              "answerText": "Arthur Conan Doyle",
+              "isCorrect": false
+            },
+            {
+              "answerText": "Agathe Christie",
+              "isCorrect": true
+            }
+          ]
+        },
+        {
+          "questionText": "Who played the 13th incarnation of the Doctor in Doctor Who?",
+          "answers": [
+            {
+              "answerText": "Matt Smith",
+              "isCorrect": false
+            },
+            {
+              "answerText": "Jodie Comer",
+              "isCorrect": true
+            },
+            {
+              "answerText": "David Tennant",
+              "isCorrect": false
+            },
+            {
+              "answerText": "Patrick Steward",
+              "isCorrect": false
+            }
+          ]
+        }
+      ]
+    },
+    "timer": 120
+  }
+}

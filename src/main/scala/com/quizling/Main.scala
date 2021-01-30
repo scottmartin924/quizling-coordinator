@@ -14,7 +14,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 // TODO Add more testing (especially async testing)
-// TODO Add a readme once everything is running and looks moderately not terrible
 // TODO Add code docs
 // TODO Improve logging (look into Akka logging)
 // TODO Fault tolerance (Akka persistence, and more watchers, etc)
@@ -27,8 +26,9 @@ object QuizlingApp extends App {
     implicit val system = context.system
     implicit val ec = system.executionContext
 
-    val PORT_CONFIG_KEY = "system.app.http.port"
-    val port = ConfigFactory.load().getInt(PORT_CONFIG_KEY)
+    val HTTP_CONFIG_KEY = "system.app.http"
+    val httpConfig = ConfigFactory.load().getConfig(HTTP_CONFIG_KEY)
+
 
     // Create db connection and give it to director
     val collection = DbCreator.connectToMatchResultCollection()
@@ -39,7 +39,7 @@ object QuizlingApp extends App {
 
     val routes = new MatchController(directorActor.ref)
 
-    Http()(context.system).newServerAt("localhost", port).bind(routes.routes)
+    Http()(context.system).newServerAt(httpConfig.getString("host"), httpConfig.getInt("port")).bind(routes.routes)
       .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 10.seconds))
         .onComplete {
           case Success(value) => {
