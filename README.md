@@ -4,7 +4,8 @@
  deploy this for an audience larger than myself
 
 This is a project which is meant to provide the engine for a quiz application 
-(rather nonsensically called Quizling) allowing multiple users to compete against each while taking a quiz.
+(rather nonsensically called Quizling) allowing multiple users to compete against each while taking a quiz. It
+was inspired by [*kahoot!*](http://kahoot.com).
 It is written in Scala, built on
 Akka, and writes records to MongoDB.
 
@@ -12,16 +13,6 @@ This is my first project using both Scala and Akka so there are certainly lots o
 It's a work-in progress both in terms of adding features and refactoring. If you have suggestions feel free to open an issue; I'd love to hear
 about things that could be improved.
 Use any code snippets with the knowledge that they could be completely wrong.
-
-## Future: Larger Quizling Ecosystem
-The idea is to have this be the first of a sequence of projects to "build" a quiz app which 
-was inspired by [*kahoot!*](http://kahoot.com) but I'm sure there are many similar apps that do this. This project is
-meant to be followed by:
-1. A simple frontend allowing users to actually "play" each
-2. A "trivia service" which would allow users to create their own custom quizzes. These custom
-quizzes could be sent to this project and this engine would allow matches to be completed using the custom quizzes
-3. A "match statistics service" which would allow users to see statistics for their matches and, perhaps,
-build experience points or level up or something similar
 
 ### Starting the Application
 Run the application using the command `sbt run`
@@ -45,3 +36,13 @@ There are two main configurations to set both of which are found in the `applica
 port for the http server (which uses Akka HTTP)
 2. `system.db` contains the host (`host`), database name (`name`), and Mongo collection name (`match.collection.name`) for the Mongo
 collection that will store results of quiz matches
+
+## Future: Larger Quizling Ecosystem
+The idea is to have this be the first of a sequence of projects to "build" a quiz app which 
+was inspired by [*kahoot!*](http://kahoot.com) but I'm sure there are many similar apps that do this. This project is
+meant to be followed by:
+1. A simple frontend allowing users to actually "play" each
+2. A "trivia service" which would allow users to create their own custom quizzes. These custom
+quizzes could be sent to this project and this engine would allow matches to be completed using the custom quizzes
+3. A "match statistics service" which would allow users to see statistics for their matches and, perhaps,
+build experience points or level up or something similar
