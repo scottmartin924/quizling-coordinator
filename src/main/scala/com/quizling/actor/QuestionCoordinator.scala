@@ -2,9 +2,15 @@ package com.quizling.actor
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, TimerScheduler}
 import akka.actor.typed.{ActorRef, Behavior}
-import com.quizling.actor.MatchCoordinator.{IncorrectAnswerMessage, QuestionAction, QuestionConfiguration, QuestionReadyMessage, QuestionResolvedMessage, QuestionResult}
-import com.quizling.actor.QuestionCoordinator.{AnswerQuestionRequest, ProposedAnswer, QuestionEvent, QuestionTimeout, QuizAnswer}
+import com.quizling.actor.MatchCoordinator.{IncorrectAnswerMessage, QuestionAction, QuestionReadyMessage, QuestionResolvedMessage}
+import com.quizling.actor.QuestionCoordinator.{AnswerQuestionRequest, ProposedAnswer, QuestionConfiguration, QuestionEvent, QuestionResult, QuestionTimeout, QuizAnswer}
 
+import scala.concurrent.duration.FiniteDuration
+
+/**
+ * QuestionCoordinator actor companion object to setup the actor and
+ * to story the event classes the actor will receive
+ */
 object QuestionCoordinator {
   def apply(questionId: String,
             questionConfig: QuestionConfiguration,
@@ -24,8 +30,24 @@ object QuestionCoordinator {
   sealed trait QuestionEvent
   final case class AnswerQuestionRequest(questionId: String, participantId: String, answer: ProposedAnswer) extends QuestionEvent
   private final case object QuestionTimeout extends QuestionEvent
+
+  final case class QuestionConfiguration(question: Question, timer: Option[FiniteDuration] = None)
+  final case class QuestionResult(answeredCorrectly: Boolean,
+                                  answeredBy: Option[String] = None,
+                                  answer: QuizAnswer,
+                                  timedOut: Boolean = false
+                                 )
 }
 
+/**
+ * Actor to manage quiz questions; determines if answers are correct, handles question timeouts
+ * @param ctx the actor system context
+ * @param questionId the id of the question
+ * @param config the question configuration including the question, answers, and timeout
+ * @param participants the participants eligible to answer this question
+ * @param timers system timers to handle timing question and ending question when time expires
+ * @param requester the actor that spawned this question. Question results and events will be sent to this actor
+ */
 class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
                           questionId: String,
                           config: QuestionConfiguration,
@@ -47,12 +69,13 @@ class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
 
   override def onMessage(msg: QuestionEvent): Behavior[QuestionEvent] = {
     msg match {
-      // FIXME This is awful...I think can use deeper pattern matching to help
+      // NOTE: This could probably be written cleaner...so many nested if/else doesn't feel very scala-like
       case AnswerQuestionRequest(`questionId`, participantId, proposedAnswer) => {
         if (participantAnswers.contains(participantId)) {
           context.log.info(s"Question $questionId answered by $participantId being ignored since participant has already answered")
           this
-        } else {
+        }
+        else {
           // If correct answer
           if (proposedAnswer.answerId == correctAnswer.answerId) {
             context.log.info(s"Question $questionId answered correctly by answer ${proposedAnswer.answerId}")
@@ -60,7 +83,8 @@ class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
             val questionResult = QuestionResult(answeredCorrectly = true, answeredBy = Some(participantId), answer = correctAnswer)
             requester ! QuestionResolvedMessage(questionId, questionResult)
             Behaviors.stopped
-          } else {
+          }
+          else {
             context.log.info(s"Question $questionId answered incorrectly by answer ${proposedAnswer.answerId}")
             participantAnswers += (participantId -> proposedAnswer)
             // Set participant as having answered
@@ -72,7 +96,8 @@ class QuestionCoordinator(ctx: ActorContext[QuestionEvent],
               val result = QuestionResult(answeredCorrectly = false, answer = correctAnswer, timedOut = false)
               requester ! QuestionResolvedMessage(questionId, result)
               Behaviors.stopped
-            } else {
+            }
+            else {
               this
             }
           }

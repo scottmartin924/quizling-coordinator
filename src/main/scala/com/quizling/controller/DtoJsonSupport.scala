@@ -4,6 +4,10 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.quizling.shared.dto.{AnswerConfigurationDto, CreateMatchResponse, Link, MatchConfigurationDto, MatchParticipantDto, QuestionConfigurationDto, QuizDto, StartMatchDto}
 import spray.json.DefaultJsonProtocol
 
+/**
+ * Trait to setup jsonFormats for web dtos (not for socket dtos...that is found in
+ * SocketJsonSupport). Uses spray-json
+ */
 trait DtoJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val answerFormat = jsonFormat2(AnswerConfigurationDto)
   implicit val questionFormat = jsonFormat2(QuestionConfigurationDto)

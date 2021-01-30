@@ -1,6 +1,5 @@
 package com.quizling.db
 
-import com.quizling.shared.entities.DbEntity
 import org.mongodb.scala.{Completed, MongoCollection, Observer}
 
 /**

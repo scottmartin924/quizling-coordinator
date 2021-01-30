@@ -1,10 +1,15 @@
 package com.quizling.actor
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import com.quizling.shared.dto.socket.Protocol._
-import spray.json.{DefaultJsonProtocol, JsValue, RootJsonFormat, _}
+import com.quizling.shared.dto.socket.Protocol.{AnswerCorrectEvent, AnswerIncorrectEvent, AnswerSocketDto, ClientEvent, MatchCompleteEvent, ParticipantReady, QuestionSocketDto, QuestionTimeOutEvent, ServerEvent, SocketDto, SubmittedAnswerEvent}
+import spray.json._
 
+/**
+ * Trait to allow de/serialization of socket messages using spray-json. Sets up jsonFormats for
+ * each SocketDto type and has custom formats for the intermediate traits
+ */
 trait SocketJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
+  // Need type hint field for deserialization
   private val TYPE_HINT_FIELD = "@type"
 
   implicit val answerSocketFormat = jsonFormat2(AnswerSocketDto)

@@ -20,11 +20,13 @@ import com.quizling.shared.dto.socket.SocketDtoToCoordinatorEventAdapter
 import com.quizling.shared.entities.MatchReport
 import spray.json._
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-
+/**
+ * Director actor setup and actor events
+ */
 object Director {
   def apply(dbInsertWriter: AbstractDbInsert[MatchReport]): Behavior[Director.DirectorCommand] = {
     Behaviors.setup(ctx => new Director(ctx, dbInsertWriter))
@@ -36,20 +38,20 @@ object Director {
   final case class MatchCompleted(matchId: String, matchResult: MatchResult) extends DirectorCommand
 
   sealed trait DirectorResponse
-
-  // Query for match coordinator
   final case class RetrieveMatchCoordinator(matchId: String, replyTo: ActorRef[RespondMatchQueryCoordinator]) extends DirectorCommand
   final case class RespondMatchQueryCoordinator(actorRef: Option[ActorRef[MatchCoordinatorEvent]]) extends DirectorResponse
-
-  // Query for match flow
   final case class RespondMatchQueryFlow(flow: Option[Flow[Message, Message, Any]]) extends DirectorResponse
   final case class RetrieveMatchFlow(matchId: String, replyTo: ActorRef[RespondMatchQueryFlow]) extends DirectorCommand
 
-  final case class Quiz(val questions: Seq[Question])
-  final case class MatchConfiguration(participants: Set[MatchParticipant], quiz: Quiz, timer: Option[FiniteDuration]) {
-    require(!participants.isEmpty)
-  }
+  final class MatchDependencies(val coordinator: ActorRef[MatchCoordinatorEvent],
+                                val socketFlow: Flow[Message, Message, Any])
+  final case class MatchResult(score: Map[String, Int])
 
+  // Domain objects for director
+  final case class Quiz(questions: Seq[Question])
+  final case class MatchConfiguration(participants: Set[MatchParticipant], quiz: Quiz, timer: Option[FiniteDuration]) {
+    require(participants.nonEmpty)
+  }
   // MatchConfigurationDto -> MatchConfiguration mapper (probably a nicer way to do this...maybe an implicit conversion but that seems overly confusing)
   // If we had more of these better to define a mapper for each class (or get a library that does) but that seems like overkill here
   object MatchConfiguration {
@@ -63,12 +65,14 @@ object Director {
       MatchConfiguration(participants, Quiz(questions), Some(timer))
     }
   }
-
-  final class MatchDependencies(val coordinator: ActorRef[MatchCoordinatorEvent],
-                                val socketFlow: Flow[Message, Message, Any])
-  final case class MatchResult(score: Map[String, Int])
 }
 
+/**
+ * Director actor to handle all matches. This is a top-level actor for which there's only one running per-instance. It
+ * will delegate work to MatchCoordinators as matches are started and write db results as matches complete
+ * @param ctx the actorcontext for the actor system
+ * @param dbInserter the database inserter to write match results to
+ */
 class Director(ctx: ActorContext[Director.DirectorCommand], dbInserter: AbstractDbInsert[MatchReport])
   extends AbstractBehavior[Director.DirectorCommand](ctx)
   with SocketJsonSupport {

@@ -6,13 +6,14 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, Tim
 import akka.actor.typed.{ActorRef, Behavior}
 import com.quizling.actor.Director.{DirectorCommand, MatchCompleted, MatchConfiguration, MatchResult}
 import com.quizling.actor.MatchCoordinator._
-import com.quizling.actor.QuestionCoordinator.{AnswerQuestionRequest, ProposedAnswer, Question, QuestionEvent, QuizAnswer}
+import com.quizling.actor.QuestionCoordinator.{apply => _, _}
 import com.quizling.shared.dto.socket.Protocol._
 
 import scala.concurrent.duration._
 
-
-
+/**
+ * Actor companion object for setting up actor and contains actor event objects
+ */
 object MatchCoordinator {
   def apply(matchId: String,
             matchConfiguration: MatchConfiguration,
@@ -34,14 +35,18 @@ object MatchCoordinator {
 
   // Match coordinator domain objects
   final case class MatchParticipant(participantId: String)
-  final case class QuestionConfiguration(question: Question, timer: Option[FiniteDuration] = None)
-  final case class QuestionResult(answeredCorrectly: Boolean,
-                                  answeredBy: Option[String] = None,
-                                  answer: QuizAnswer,
-                                  timedOut: Boolean = false
-                                 )
 }
 
+/**
+ * Actor to handle running matches. Will track match score and participants; also materializes questions but then
+ * delegates incoming answers to QuestionCoordinator to determine if answers correct
+ * @param ctx the actor context from the actor system
+ * @param matchId the id for the match
+ * @param matchConfiguration the match configuration (including participants, question timeout, quiz)
+ * @param director the director that created the match coordinator. Used to send final match result to
+ * @param socketWriter actor to send messages to be sent through websocket to the clients involved in the match
+ * @param timers system timers used to delay question generation
+ */
 class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: String,
                        val matchConfiguration: MatchConfiguration,
                        val director: ActorRef[DirectorCommand],
@@ -58,8 +63,6 @@ class MatchCoordinator(val ctx: ActorContext[MatchCoordinatorEvent], matchId: St
   private var participantsActive: Set[String] = Set.empty
   private var score: Map[String, Int] = (for (participant <- matchConfiguration.participants; id = participant.participantId)
     yield { id -> DEFAULT_SCORE }).toMap
-
-  // Need to hydrate answers with answer ids
   private var quizQuestions: Seq[Question] = matchConfiguration.quiz.questions
   private var activeQuestions = Map.empty[String, ActorRef[QuestionEvent]]
   private var completedQuestions = List.empty[QuestionResult]

@@ -1,6 +1,8 @@
 package com.quizling.shared.dto
 
-// Very simple HATEOAS-like links
+/**
+ * Very simple HATEOAS-like links
+ */
 case class Link(href: String)
 class ResponseDto(_links: Map[String, Link])
 

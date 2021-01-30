@@ -13,14 +13,20 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
+// High priority
 // TODO Add more testing (especially async testing)
 // TODO Add code docs
-// TODO Improve logging (look into Akka logging)
-// TODO Fault tolerance (Akka persistence, and more watchers, etc)
+
+// Low priority
+// TODO Fault tolerance (Akka persistence, add more watchers, etc)
 
 // Very low priority
-// TODO Convert OO style to functional just to try to understand it better
+// TODO Convert OO style to functional just for fun
 
+/**
+ * Main class run when app runs.
+ * Sets up http server and starts actor system
+ */
 object QuizlingApp extends App {
   val root = Behaviors.setup[Nothing]{ context =>
     implicit val system = context.system

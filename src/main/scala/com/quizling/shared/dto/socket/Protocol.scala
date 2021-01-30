@@ -1,5 +1,11 @@
 package com.quizling.shared.dto.socket
 
+/**
+ * Socket protocol used throughout the app
+ * ClientEvent represents a socket message which the client will send to the server
+ * ServerEvent represents a socket message which the server will send to the client
+ * SocketEvent represents socket events (not individual messages, but messages that relate to the socket connection)
+ */
 object Protocol {
   sealed trait SocketDto
 

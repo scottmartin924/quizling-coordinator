@@ -15,8 +15,12 @@ import com.quizling.shared.dto.{CreateMatchResponse, Link, StartMatchDto}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
+/**
+ * Controller for handling http and websocket requests
+ * @param director the director actor to forward messages to
+ * @param actorSystem the actor system (needed by akka http)
+ */
 class MatchController(val director: ActorRef[DirectorCommand])(implicit actorSystem: ActorSystem[_])
   extends Directives
   with DtoJsonSupport {
@@ -33,14 +37,10 @@ class MatchController(val director: ActorRef[DirectorCommand])(implicit actorSys
           get {
             path(MATCH_STREAM_PATH) {
               parameter(MATCH_STREAM_PARAM) { matchId =>
-                // FIXME Right now this timeout is killing the app..that's not good
-                implicit val timeout: Timeout = 10 seconds
-
-                // FIXME This whole section is awful. I don't think we can avoid await (although maybe I'm wrong) but
-                // at least need to handle potential errors better
+                implicit val timeout: Timeout = 10.seconds
                 val response: Future[RespondMatchQueryFlow] = director.ask[RespondMatchQueryFlow](ref => Director.RetrieveMatchFlow(matchId, ref))
                 val flow: Future[Flow[Message, Message, Any]] = response.map(_.flow.get)
-                val flowResult = Await.result(flow, 3 seconds)
+                val flowResult = Await.result(flow, 3.seconds)
                 handleWebSocketMessages(flowResult)
               }
             }
